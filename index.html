@@ -9,15 +9,54 @@
       margin: 0;
       height: 100vh;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       background: linear-gradient(135deg, #1f2933, #111827);
       font-family: system-ui, sans-serif;
+      color: white;
     }
 
     .stage {
       display: flex;
       gap: 40px;
+      margin-bottom: 20px;
+    }
+
+    #message {
+      position: relative;
+      opacity: 0;
+      font-size: 26px;
+      margin-top: 10px;
+      pointer-events: none;
+    }
+
+    #message.show {
+      animation: floatHeart 3s ease-out forwards;
+    }
+
+    @keyframes floatHeart {
+      0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.8);
+      }
+      15% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      70% {
+        opacity: 1;
+        transform: translateY(-40px) scale(1.05);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-80px) scale(1.1);
+      }
+    }
+
+    #message.show {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     .character {
@@ -44,6 +83,19 @@
         transform: translateY(0) scale(1);
       }
       30% {
+        transform: translateY(-90px) scale(1.05);
+      }
+      55% {
+        transform: translateY(-20px) scale(1);
+      }
+      75% {
+        transform: translateY(-10px) scale(1);
+      }
+      100% {
+        transform: translateY(0) scale(1);
+      }
+    }
+      30% {
         transform: translateY(-60px) scale(1.05);
       }
       60% {
@@ -61,7 +113,23 @@
 </head>
 <body>
   <div class="stage">
-    <div class="character">🐺</div>
+    <div class="character" data-name="wolf">🐺</div>
+    <div class="character" data-name="pig">🐖</div>
+    <div class="character" data-name="rabbit">🐇</div>
+    <div class="character" data-name="llama">🦙</div>
+    <div class="character" data-name="squirrel">🐿️</div>
+    <div class="character" data-name="chick">🐥</div>
+    <div class="character" data-name="puppy">🐶</div>
+    <div class="character" data-name="fennec">🦊</div>
+  </div>
+
+  <div id="message">💖 wishing you a good day teresa!!!!</div>
+    <div class="character" data-name="bunny">🐇</div>
+    <div class="character" data-name="pig">🐖</div>
+    <div class="character" data-name="quokka">🦘</div>
+  </div>
+
+  <div id="message">&lt;3 wishing you a good day teresa!!!!</div>
     <div class="character">🐇</div>
     <div class="character">🐖</div>
     <div class="character">🦘</div>
@@ -70,12 +138,20 @@
   <script>
     const characters = document.querySelectorAll('.character');
 
+    const message = document.getElementById('message');
+
     characters.forEach((char) => {
       char.addEventListener('click', () => {
-        // Restart animation if clicked repeatedly
         char.classList.remove('jumping');
         void char.offsetWidth; // force reflow
         char.classList.add('jumping');
+
+        // Special trigger: if this character reaches the "high jump"
+        if (char.dataset.name === 'rabbit') {
+          message.classList.remove('show');
+          void message.offsetWidth;
+          message.classList.add('show');
+        }
       });
     });
   </script>
