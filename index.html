@@ -3,157 +3,162 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Clickable Character Jump</title>
+  <title>Enjoy!!!</title>
   <style>
     body {
       margin: 0;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
       background: linear-gradient(135deg, #1f2933, #111827);
       font-family: system-ui, sans-serif;
       color: white;
+      overflow: hidden;
     }
 
-    .stage {
-      display: flex;
-      gap: 40px;
-      margin-bottom: 20px;
+    .finish-line {
+      position: absolute;
+      bottom: 260px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, white 0 10px, transparent 10px 20px);
+      opacity: 0.6;
+    }
+
+    .finish-label {
+      position: absolute;
+      bottom: 268px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      opacity: 0.7;
     }
 
     #message {
-      position: relative;
+      position: absolute;
+      bottom: 300px;
+      left: 50%;
+      transform: translateX(-50%);
       opacity: 0;
       font-size: 26px;
-      margin-top: 10px;
+      text-align: center;
       pointer-events: none;
+      max-width: 90%;
     }
 
     #message.show {
       animation: floatHeart 3s ease-out forwards;
     }
 
-    @keyframes floatHeart {
-      0% {
-        opacity: 0;
-        transform: translateY(20px) scale(0.8);
-      }
-      15% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-      70% {
-        opacity: 1;
-        transform: translateY(-40px) scale(1.05);
-      }
-      100% {
-        opacity: 0;
-        transform: translateY(-80px) scale(1.1);
-      }
+    #message.big {
+      font-size: 48px;
+      font-weight: bold;
     }
 
-    #message.show {
-      opacity: 1;
-      transform: translateY(0);
+    @keyframes floatHeart {
+      0% { opacity: 0; transform: translate(-50%, 20px) scale(0.8); }
+      15% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      70% { opacity: 1; transform: translate(-50%, -60px) scale(1.05); }
+      100% { opacity: 0; transform: translate(-50%, -140px) scale(1.1); }
+    }
+
+    .stage {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 28px;
+      align-items: flex-end;
     }
 
     .character {
-      width: 120px;
-      height: 120px;
-      border-radius: 24px;
-      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      width: 72px;
+      height: 72px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 56px;
+      font-size: 48px;
       cursor: pointer;
       user-select: none;
-      transition: transform 0.2s ease;
-    }
-
-    .character:active {
-      transform: scale(0.95);
-    }
-
-    /* Jump animation */
-    @keyframes jump {
-      0% {
-        transform: translateY(0) scale(1);
-      }
-      30% {
-        transform: translateY(-90px) scale(1.05);
-      }
-      55% {
-        transform: translateY(-20px) scale(1);
-      }
-      75% {
-        transform: translateY(-10px) scale(1);
-      }
-      100% {
-        transform: translateY(0) scale(1);
-      }
-    }
-      30% {
-        transform: translateY(-60px) scale(1.05);
-      }
-      60% {
-        transform: translateY(0) scale(0.98);
-      }
-      100% {
-        transform: translateY(0) scale(1);
-      }
-    }
-
-    .jumping {
-      animation: jump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
     }
   </style>
 </head>
 <body>
+
+  <div class="finish-line"></div>
+  <div class="finish-label">FINISH LINE</div>
+  <div id="message"></div>
+
   <div class="stage">
-    <div class="character" data-name="wolf">🐺</div>
-    <div class="character" data-name="pig">🐖</div>
-    <div class="character" data-name="rabbit">🐇</div>
-    <div class="character" data-name="llama">🦙</div>
-    <div class="character" data-name="squirrel">🐿️</div>
-    <div class="character" data-name="chick">🐥</div>
-    <div class="character" data-name="puppy">🐶</div>
-    <div class="character" data-name="fennec">🦊</div>
+    <div class="character" data-key="wolf">🐺</div>
+    <div class="character" data-key="rabbit">🐇</div>
+    <div class="character" data-key="pig">🐖</div>
+    <div class="character" data-key="llama">🦙</div>
+    <div class="character" data-key="squirrel">🐿️</div>
+    <div class="character" data-key="chick">🐥</div>
+    <div class="character" data-key="puppy">🐶</div>
+    <div class="character" data-key="fennec">🦊</div>
   </div>
 
-  <div id="message">💖 wishing you a good day teresa!!!!</div>
-    <div class="character" data-name="bunny">🐇</div>
-    <div class="character" data-name="pig">🐖</div>
-    <div class="character" data-name="quokka">🦘</div>
-  </div>
-
-  <div id="message">&lt;3 wishing you a good day teresa!!!!</div>
-    <div class="character">🐇</div>
-    <div class="character">🐖</div>
-    <div class="character">🦘</div>
-  </div>
 
   <script>
     const characters = document.querySelectorAll('.character');
-
     const message = document.getElementById('message');
 
-    characters.forEach((char) => {
-      char.addEventListener('click', () => {
-        char.classList.remove('jumping');
-        void char.offsetWidth; // force reflow
-        char.classList.add('jumping');
+    const STEP = 18;
+    const TRIGGER_HEIGHT = 240;
 
-        // Special trigger: if this character reaches the "high jump"
-        if (char.dataset.name === 'rabbit') {
+    const winMessages = {
+      wolf: 'Wolf Chan wishing you a great day and thanks you!!! HOWL 🐺 *tail wag lick*',
+      rabbit: 'Leebit appreciates you and you are spared from the air fryer 😌 🐰',
+      pig: 'Dwakki will take you out to an all you can eat buffet to celebrate 🍝 🐖',
+      llama: '💁‍♂️ llamajinni thanks you for your loyalty 🦙 *spit and lick*',
+      squirrel: 'YO hanquokka number 1 ✌️ respect 🐿️',
+      chick: '🍪🍪 free cookies for all!!! *chirp chirp* 🐤',
+      puppy: 'PUPPYM IN THE BUILDING! 🐶🐶 *lick*',
+      fennec: 'Yip! we did it!! 🦊'
+    };
+
+    const winners = new Set();
+
+    characters.forEach(char => {
+      char.dataset.height = 0;
+
+      char.addEventListener('click', () => {
+        let height = parseInt(char.dataset.height, 10);
+        height += STEP;
+        char.dataset.height = height;
+        char.style.transform = `translateY(${-height}px)`;
+
+        if (height >= TRIGGER_HEIGHT) {
+          const key = char.dataset.key;
+          winners.add(key);
+
+          message.classList.remove('big');
+          message.innerHTML = winMessages[key];
+
+          if (winners.size === Object.keys(winMessages).length) {
+            message.innerHTML = `${winMessages[key]}<br><br>💖 Wishing you a good day Teresa!!!!`;
+            message.classList.add('big');
+          }
+
           message.classList.remove('show');
           void message.offsetWidth;
           message.classList.add('show');
+
+          char.dataset.height = 0;
+          setTimeout(() => char.style.transform = 'translateY(0)', 100);
         }
+
+        clearTimeout(char.fallTimer);
+        char.fallTimer = setTimeout(() => {
+          char.dataset.height = 0;
+          char.style.transform = 'translateY(0)';
+        }, 1400);
       });
     });
   </script>
+
 </body>
 </html>
