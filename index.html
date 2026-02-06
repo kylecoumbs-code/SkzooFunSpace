@@ -1,164 +1,821 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Enjoy!!!</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ferret Hug Quest</title>
   <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      background: linear-gradient(135deg, #1f2933, #111827);
-      font-family: system-ui, sans-serif;
-      color: white;
-      overflow: hidden;
+    :root { color-scheme: dark; }
+    body{
+      margin:0;background:#0b0d12;color:#e9eef8;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      display:grid;place-items:center;height:100vh;
     }
-
-    .finish-line {
-      position: absolute;
-      bottom: 260px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: repeating-linear-gradient(90deg, white 0 10px, transparent 10px 20px);
-      opacity: 0.6;
+    .wrap{ width:min(980px,96vw); }
+    canvas{
+      width:100%;height:auto;border-radius:16px;
+      background: radial-gradient(1200px 700px at 30% 20%, #162044 0%, #0b0d12 55%, #06070a 100%);
+      box-shadow:0 10px 40px rgba(0,0,0,.55);
+      display:block;
     }
-
-    .finish-label {
-      position: absolute;
-      bottom: 268px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 14px;
-      opacity: 0.7;
+    .hud{
+      display:flex;gap:14px;flex-wrap:wrap;
+      align-items:center;justify-content:space-between;
+      margin:10px 2px 12px;font-size:14px;opacity:.95;
     }
-
-    #message {
-      position: absolute;
-      bottom: 300px;
-      left: 50%;
-      transform: translateX(-50%);
-      opacity: 0;
-      font-size: 26px;
-      text-align: center;
-      pointer-events: none;
-      max-width: 90%;
+    .pill{
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      padding:8px 10px;border-radius:999px;
+      display:inline-flex;gap:10px;align-items:center;
+      backdrop-filter:blur(6px);
     }
-
-    #message.show {
-      animation: floatHeart 3s ease-out forwards;
+    .keys{ opacity:.85; }
+    .btn{
+      cursor:pointer;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+      color:#e9eef8;padding:8px 12px;border-radius:999px;
+      font-weight:600;
     }
-
-    #message.big {
-      font-size: 48px;
-      font-weight: bold;
-    }
-
-    @keyframes floatHeart {
-      0% { opacity: 0; transform: translate(-50%, 20px) scale(0.8); }
-      15% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-      70% { opacity: 1; transform: translate(-50%, -60px) scale(1.05); }
-      100% { opacity: 0; transform: translate(-50%, -140px) scale(1.1); }
-    }
-
-    .stage {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 28px;
-      align-items: flex-end;
-    }
-
-    .character {
-      width: 72px;
-      height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 48px;
-      cursor: pointer;
-      user-select: none;
-      transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-    }
+    .btn:hover{ background:rgba(255,255,255,.14); }
   </style>
 </head>
 <body>
-
-  <div class="finish-line"></div>
-  <div class="finish-label">FINISH LINE</div>
-  <div id="message"></div>
-
-  <div class="stage">
-    <div class="character" data-key="wolf">🐺</div>
-    <div class="character" data-key="rabbit">🐇</div>
-    <div class="character" data-key="pig">🐖</div>
-    <div class="character" data-key="llama">🦙</div>
-    <div class="character" data-key="squirrel">🐿️</div>
-    <div class="character" data-key="chick">🐥</div>
-    <div class="character" data-key="puppy">🐶</div>
-    <div class="character" data-key="fennec">🦊</div>
+  <div class="wrap">
+    <div class="hud">
+      <div class="pill" id="status">Loading…</div>
+      <div class="pill keys">
+        Move: <b>WASD</b>/<b>Arrows</b> · Hug: <b>Space</b> · Restart: <b>R</b>
+      </div>
+      <button class="btn" id="restartBtn">Restart</button>
+    </div>
+    <canvas id="game" width="960" height="540"></canvas>
   </div>
 
+<script>
+(() => {
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const statusEl = document.getElementById("status");
+  const restartBtn = document.getElementById("restartBtn");
 
-  <script>
-    const characters = document.querySelectorAll('.character');
-    const message = document.getElementById('message');
+  // helpers
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const len = (x,y)=>Math.hypot(x,y);
+  const now = ()=>performance.now();
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  function rnd(min,max){ return Math.random()*(max-min)+min; }
+  function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
 
-    const STEP = 18;
-    const TRIGGER_HEIGHT = 240;
+  // world
+  const WORLD = { w: canvas.width, h: canvas.height, pad: 26 };
+  const keys = new Set();
 
-    const winMessages = {
-      wolf: 'Wolf Chan wishing you a great day and thanks you!!! HOWL 🐺 *tail wag lick*',
-      rabbit: 'Leebit appreciates you and you are spared from the air fryer 😌 🐰',
-      pig: 'Dwakki will take you out to an all you can eat buffet to celebrate 🍝 🐖',
-      llama: '💁‍♂️ llamajinni thanks you for your loyalty 🦙 *spit and lick*',
-      squirrel: 'YO hanquokka number 1 ✌️ respect 🐿️',
-      chick: '🍪🍪 free cookies for all!!! *chirp chirp* 🐤',
-      puppy: 'PUPPYM IN THE BUILDING! 🐶🐶 *lick*',
-      fennec: 'Yip! we did it!! 🦊'
+  const COLORS = {
+    ferret:"#d6b08a", ferret2:"#a87853",
+    rabbit:"#dfe8ff", rabbit2:"#9fb5ff",
+    squirrel:"#c6865d", squirrel2:"#6b3b25",
+    text:"#e9eef8", hurt:"#ff6b6b",
+    good:"#78ffa8", gold:"#ffd166",
+    pink:"#ff7ac8"
+  };
+
+  let state;
+
+  function reset(){
+    const startSide = pick(["left","right","top","bottom"]);
+    const ferretStart = spawnOnEdge(startSide);
+    const rabbitPos = spawnFarFrom(ferretStart.x, ferretStart.y, 360);
+
+    state = {
+      startedAt: now(),
+      finishedAt: null,
+      gameOver: false,
+      win: false,
+
+      // hug / victory states
+      hugging: false,
+      hugStartedAt: 0,
+      hugDurationMs: 1200,
+      victory: false,
+      victoryStartedAt: 0,
+
+      timePenaltyMs: 0,
+      hits: 0,
+
+      ferret: { x:ferretStart.x, y:ferretStart.y, r:16, vx:0, vy:0, baseSpeed:235, slowUntil:0 },
+      rabbit: { x:rabbitPos.x, y:rabbitPos.y, r:18, wobble:0 },
+
+      // ONLY ONE squirrel, slower than ferret:
+      squirrel: makeSquirrel(),
+
+      obstacles: makeObstacles(7),
+      particles: [],
+      hearts: [] // used for victory screen hearts
     };
+    updateStatus();
+  }
 
-    const winners = new Set();
+  function spawnOnEdge(side){
+    const p = WORLD.pad;
+    if(side==="left") return { x:p, y:rnd(p, WORLD.h-p) };
+    if(side==="right") return { x:WORLD.w-p, y:rnd(p, WORLD.h-p) };
+    if(side==="top") return { x:rnd(p, WORLD.w-p), y:p };
+    return { x:rnd(p, WORLD.w-p), y:WORLD.h-p };
+  }
 
-    characters.forEach(char => {
-      char.dataset.height = 0;
+  function spawnFarFrom(x,y,minDist){
+    for(let i=0;i<200;i++){
+      const p = WORLD.pad;
+      const rx = rnd(p, WORLD.w-p);
+      const ry = rnd(p, WORLD.h-p);
+      if(len(rx-x, ry-y) >= minDist) return { x:rx, y:ry };
+    }
+    return { x:WORLD.w*0.7, y:WORLD.h*0.5 };
+  }
 
-      char.addEventListener('click', () => {
-        let height = parseInt(char.dataset.height, 10);
-        height += STEP;
-        char.dataset.height = height;
-        char.style.transform = `translateY(${-height}px)`;
+  function makeObstacles(n){
+    const obs=[];
+    for(let i=0;i<n;i++){
+      const r=rnd(22,44);
+      const x=rnd(WORLD.pad+r, WORLD.w-WORLD.pad-r);
+      const y=rnd(WORLD.pad+r, WORLD.h-WORLD.pad-r);
+      obs.push({x,y,r});
+    }
+    return obs;
+  }
 
-        if (height >= TRIGGER_HEIGHT) {
-          const key = char.dataset.key;
-          winners.add(key);
+  function makeSquirrel(){
+    return {
+      x: rnd(WORLD.pad, WORLD.w-WORLD.pad),
+      y: rnd(WORLD.pad, WORLD.h-WORLD.pad),
+      r: 15,
+      vx:0, vy:0,
+      maxSpeed: 145, // slower than ferret
+      mood: rnd(0, Math.PI*2),
+      stunUntil: 0
+    };
+  }
 
-          message.classList.remove('big');
-          message.innerHTML = winMessages[key];
+  // input
+  window.addEventListener("keydown",(e)=>{
+    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+    keys.add(e.key.toLowerCase());
 
-          if (winners.size === Object.keys(winMessages).length) {
-            message.innerHTML = `${winMessages[key]}<br><br>💖 Wishing you a good day Teresa!!!!`;
-            message.classList.add('big');
-          }
+    if(e.key.toLowerCase()==="r") reset();
+    if(e.key===" " && state && !state.gameOver) tryHug();
+  });
+  window.addEventListener("keyup",(e)=>keys.delete(e.key.toLowerCase()));
+  restartBtn.addEventListener("click", reset);
 
-          message.classList.remove('show');
-          void message.offsetWidth;
-          message.classList.add('show');
+  // scoring
+  function elapsedMs(){
+    const end = state.finishedAt ?? now();
+    return (end - state.startedAt) + state.timePenaltyMs;
+  }
+  function score(){
+    const t = elapsedMs()/1000;
+    const base = 12000;
+    const timePart = Math.max(0, base - Math.floor(t*520));
+    const hitPart = Math.max(0, 2000 - state.hits*250);
+    return timePart + hitPart;
+  }
 
-          char.dataset.height = 0;
-          setTimeout(() => char.style.transform = 'translateY(0)', 100);
-        }
+  function updateStatus(){
+    if(!state) return;
+    const t = (elapsedMs()/1000).toFixed(2);
+    if(state.gameOver && state.win){
+      statusEl.innerHTML =
+        `💞 <b>VICTORY HUG!</b> Time: <b>${t}s</b> · Hits: <b>${state.hits}</b> · Score: <b>${score()}</b> (Press <b>R</b>)`;
+    } else if(state.hugging){
+      statusEl.innerHTML = `🤗 <b>HUGGING…</b> (so soft…)`;
+    } else {
+      statusEl.innerHTML =
+        `🟤 Ferret · 🐰 Rabbit · 🐿️ Squirrel: <b>1</b> · Time: <b>${t}s</b> · Hits: <b>${state.hits}</b> · Score: <b>${score()}</b>`;
+    }
+  }
 
-        clearTimeout(char.fallTimer);
-        char.fallTimer = setTimeout(() => {
-          char.dataset.height = 0;
-          char.style.transform = 'translateY(0)';
-        }, 1400);
+  // particles / hearts
+  function burst(x,y,color,count,speedMul=1.0){
+    for(let i=0;i<count;i++){
+      const a=rnd(0,Math.PI*2);
+      const sp=rnd(40,260)*speedMul;
+      state.particles.push({
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp,
+        r:rnd(2,5),
+        life:rnd(0.35,0.85),
+        color
       });
-    });
-  </script>
+    }
+  }
 
+  function spawnVictoryHearts(count=18){
+    for(let i=0;i<count;i++){
+      state.hearts.push({
+        x: rnd(40, WORLD.w-40),
+        y: rnd(-WORLD.h, -20),
+        vy: rnd(70, 170),
+        vx: rnd(-18, 18),
+        size: rnd(10, 22),
+        wob: rnd(0, Math.PI*2),
+        life: rnd(4.5, 7.5) // seconds
+      });
+    }
+  }
+
+  // obstacles push
+  function applyObstaclePush(entity){
+    for(const o of state.obstacles){
+      const dx=entity.x-o.x, dy=entity.y-o.y;
+      const d=Math.hypot(dx,dy);
+      const minD=entity.r+o.r;
+      if(d>0 && d<minD){
+        const overlap=minD-d;
+        const nx=dx/d, ny=dy/d;
+        entity.x += nx*overlap;
+        entity.y += ny*overlap;
+      }
+    }
+  }
+
+  function hurtFerret(){
+    const f=state.ferret;
+    state.hits += 1;
+    state.timePenaltyMs += 900;
+    f.slowUntil = now() + 900;
+    burst(f.x,f.y,COLORS.hurt,26);
+    updateStatus();
+  }
+
+  // Hug logic
+  function tryHug(){
+    if(state.hugging || state.victory) return;
+    const f=state.ferret, r=state.rabbit;
+    const d=len(r.x-f.x, r.y-f.y);
+    if(d <= f.r + r.r + 10){
+      // start hug animation
+      state.hugging = true;
+      state.hugStartedAt = now();
+      burst(r.x,r.y,COLORS.pink,22,1.0);
+      burst(r.x,r.y,COLORS.gold,18,1.0);
+      updateStatus();
+    } else {
+      burst(f.x,f.y,"rgba(255,255,255,.35)",10,2.0);
+    }
+  }
+
+  function finishVictory(){
+    state.gameOver = true;
+    state.win = true;
+    state.finishedAt = now();
+    state.victory = true;
+    state.victoryStartedAt = now();
+    spawnVictoryHearts(28);
+    burst(state.rabbit.x, state.rabbit.y, COLORS.pink, 55, 1.15);
+    burst(state.rabbit.x, state.rabbit.y, COLORS.gold, 35, 1.05);
+    updateStatus();
+  }
+
+  // game loop
+  let last=now();
+  function tick(){
+    const t=now();
+    const dt=clamp((t-last)/1000, 0, 0.033);
+    last=t;
+
+    if(state){
+      if(!state.gameOver){
+        update(dt,t);
+      } else {
+        updateParticles(dt);
+        updateVictoryHearts(dt);
+      }
+      draw(t);
+      if(!state.gameOver) updateStatus();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function update(dt,t){
+    const f=state.ferret;
+    const r=state.rabbit;
+
+    // rabbit wiggle
+    r.wobble += dt*2.4;
+
+    // if hugging, run hug animation (no movement inputs)
+    if(state.hugging){
+      const p = clamp((t - state.hugStartedAt) / state.hugDurationMs, 0, 1);
+
+      // move ferret toward rabbit center a bit, and rabbit toward ferret a bit (cute meet-in-middle)
+      const midx = (f.x + r.x) * 0.5;
+      const midy = (f.y + r.y) * 0.5;
+
+      f.x = lerp(f.x, midx - 10, 0.10 + p*0.08);
+      f.y = lerp(f.y, midy + 6, 0.10 + p*0.08);
+      r.x = lerp(r.x, midx + 10, 0.10 + p*0.08);
+      r.y = lerp(r.y, midy - 6, 0.10 + p*0.08);
+
+      // little heart pops during the hug
+      if(Math.random() < 0.35){
+        burst(midx, midy - 10, COLORS.pink, 4, 0.45);
+      }
+
+      // keep them in bounds
+      f.x = clamp(f.x, WORLD.pad, WORLD.w - WORLD.pad);
+      f.y = clamp(f.y, WORLD.pad, WORLD.h - WORLD.pad);
+      r.x = clamp(r.x, WORLD.pad, WORLD.w - WORLD.pad);
+      r.y = clamp(r.y, WORLD.pad, WORLD.h - WORLD.pad);
+
+      updateParticles(dt);
+
+      if(p >= 1){
+        state.hugging = false;
+        finishVictory();
+      }
+      return;
+    }
+
+    // normal movement input
+    const up=keys.has("w")||keys.has("arrowup");
+    const down=keys.has("s")||keys.has("arrowdown");
+    const left=keys.has("a")||keys.has("arrowleft");
+    const right=keys.has("d")||keys.has("arrowright");
+
+    let ax=0, ay=0;
+    if(up) ay-=1;
+    if(down) ay+=1;
+    if(left) ax-=1;
+    if(right) ax+=1;
+
+    const mag=Math.hypot(ax,ay)||1;
+    ax/=mag; ay/=mag;
+
+    const slowed = (t < f.slowUntil);
+    const speed = f.baseSpeed * (slowed ? 0.55 : 1.0);
+
+    f.vx = ax * speed;
+    f.vy = ay * speed;
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
+
+    f.x = clamp(f.x, WORLD.pad, WORLD.w - WORLD.pad);
+    f.y = clamp(f.y, WORLD.pad, WORLD.h - WORLD.pad);
+
+    applyObstaclePush(f);
+
+    // one squirrel AI (slower than ferret)
+    const s = state.squirrel;
+    if(t >= s.stunUntil){
+      s.mood += dt * 1.1;
+      const lead = 0.20;
+      const tx = f.x + f.vx * lead;
+      const ty = f.y + f.vy * lead;
+
+      let dx = tx - s.x, dy = ty - s.y;
+      const d = Math.hypot(dx, dy) || 1;
+
+      const wx = Math.cos(s.mood) * 0.25;
+      const wy = Math.sin(s.mood) * 0.25;
+
+      dx = (dx / d) + wx;
+      dy = (dy / d) + wy;
+
+      const nd = Math.hypot(dx, dy) || 1;
+      const nx = dx / nd, ny = dy / nd;
+
+      s.vx = nx * s.maxSpeed;
+      s.vy = ny * s.maxSpeed;
+
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+
+      s.x = clamp(s.x, WORLD.pad, WORLD.w - WORLD.pad);
+      s.y = clamp(s.y, WORLD.pad, WORLD.h - WORLD.pad);
+
+      applyObstaclePush(s);
+
+      if(len(s.x - f.x, s.y - f.y) <= s.r + f.r){
+        s.stunUntil = t + 0.45; // can't chain-hit
+        hurtFerret();
+      }
+    }
+
+    updateParticles(dt);
+  }
+
+  function updateParticles(dt){
+    state.particles = state.particles.filter(p=>{
+      p.life -= dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= (1 - dt*3.2);
+      p.vy *= (1 - dt*3.2);
+      return p.life > 0;
+    });
+  }
+
+  function updateVictoryHearts(dt){
+    if(!state.victory) return;
+    // continuously replenish a little
+    if(Math.random() < 0.06) spawnVictoryHearts(2);
+
+    state.hearts = state.hearts.filter(h=>{
+      h.life -= dt;
+      h.wob += dt * 2.2;
+      h.x += (h.vx + Math.sin(h.wob)*18) * dt;
+      h.y += h.vy * dt;
+
+      // wrap if needed
+      if(h.y > WORLD.h + 40){
+        h.y = rnd(-120, -20);
+        h.x = rnd(40, WORLD.w-40);
+      }
+      return h.life > 0;
+    });
+  }
+
+  // drawing
+  function draw(t){
+    ctx.clearRect(0,0,WORLD.w,WORLD.h);
+
+    // speckles
+    ctx.globalAlpha=0.10;
+    for(let i=0;i<140;i++){
+      const x=(i*73)%WORLD.w;
+      const y=(i*149)%WORLD.h;
+      const s=1+(i%3);
+      ctx.fillStyle="white";
+      ctx.fillRect(x,y,s,s);
+    }
+    ctx.globalAlpha=1;
+
+    // obstacles
+    for(const o of state.obstacles){
+      drawSoftCircle(o.x,o.y,o.r,"rgba(120,170,120,0.18)");
+      drawSoftCircle(o.x,o.y,o.r*0.72,"rgba(120,170,120,0.12)");
+    }
+
+    // rabbit + squirrel + ferret
+    drawRabbit(state.rabbit.x, state.rabbit.y, state.rabbit.r, t, state.gameOver && state.win);
+
+    const s = state.squirrel;
+    drawSquirrel(s.x, s.y, s.r, t, (t < s.stunUntil));
+
+    drawFerret(state.ferret.x, state.ferret.y, state.ferret.r, t, (t < state.ferret.slowUntil), state.hugging);
+
+    // hug cue ring (when close and not hugging)
+    const f = state.ferret, r = state.rabbit;
+    const d = len(r.x - f.x, r.y - f.y);
+    if(!state.gameOver && !state.hugging && d <= f.r + r.r + 40){
+      const pulse=0.5+0.5*Math.sin(t*0.01);
+      ctx.globalAlpha=0.65;
+      ctx.strokeStyle="rgba(255, 209, 102, 0.95)";
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r+18+pulse*6, 0, Math.PI*2);
+      ctx.stroke();
+
+      ctx.globalAlpha=0.95;
+      ctx.fillStyle=COLORS.gold;
+      ctx.font="700 16px ui-sans-serif, system-ui";
+      ctx.textAlign="center";
+      ctx.fillText("Press SPACE to HUG!", r.x, r.y - (r.r + 28));
+      ctx.globalAlpha=1;
+    }
+
+    // particles
+    for(const p of state.particles){
+      ctx.globalAlpha = clamp(p.life,0,1);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // victory hearts overlay + screen
+    if(state.victory){
+      // falling hearts
+      for(const h of state.hearts){
+        ctx.globalAlpha = clamp(h.life/2, 0, 0.9);
+        drawHeart(h.x, h.y, h.size, COLORS.pink);
+      }
+      ctx.globalAlpha=1;
+
+      // victory screen card
+      victoryOverlay(
+        "VICTORY HUG!!",
+        `Score: ${score()}  ·  Time: ${(elapsedMs()/1000).toFixed(2)}s  ·  Hits: ${state.hits}\nPress R to replay`
+      );
+    }
+  }
+
+  function victoryOverlay(title, subtitle){
+    // soft vignette
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,WORLD.w,WORLD.h);
+    ctx.globalAlpha = 1;
+
+    // card
+    const cx = WORLD.w/2, cy = WORLD.h/2;
+    const w = 640, h = 210;
+    const x = cx - w/2, y = cy - h/2;
+
+    // blur-ish glow
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = "rgba(255,122,200,0.18)";
+    ctx.beginPath();
+    ctx.roundRect(x-8, y-8, w+16, h+16, 24);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 24);
+    ctx.fill();
+    ctx.stroke();
+
+    // text
+    ctx.fillStyle = COLORS.text;
+    ctx.textAlign = "center";
+    ctx.font = "900 54px ui-sans-serif, system-ui";
+    ctx.fillText(title, cx, y + 78);
+
+    ctx.font = "500 18px ui-sans-serif, system-ui";
+    const lines = subtitle.split("\n");
+    lines.forEach((ln,i)=>ctx.fillText(ln, cx, y + 122 + i*26));
+
+    // little heart row
+    const rowY = y + h - 34;
+    for(let i=0;i<9;i++){
+      const hx = cx - 160 + i*40;
+      drawHeart(hx, rowY, 10 + (i%3)*2, COLORS.pink);
+    }
+
+    ctx.restore();
+  }
+
+  function drawSoftCircle(x,y,r,fill){
+    ctx.fillStyle=fill;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawFerret(x,y,r,t,slowed,hugging){
+    const wig = Math.sin(t*0.01)*2;
+    const hugPulse = hugging ? (1 + 0.06*Math.sin((t - state.hugStartedAt)*0.02)) : 1;
+
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(hugPulse, hugPulse);
+
+    // shadow
+    ctx.globalAlpha=0.25;
+    ctx.fillStyle="black";
+    ctx.beginPath();
+    ctx.ellipse(0, r+8, r*1.2, r*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+
+    // tail
+    ctx.strokeStyle=COLORS.ferret2;
+    ctx.lineWidth=10;
+    ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(-r*0.8, r*0.2);
+    ctx.quadraticCurveTo(-r*2.2, r*0.8+wig, -r*2.8, -r*0.2);
+    ctx.stroke();
+
+    // body
+    ctx.fillStyle=COLORS.ferret;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r*1.25, r*0.95, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // face mask
+    ctx.fillStyle="rgba(0,0,0,0.14)";
+    ctx.beginPath();
+    ctx.ellipse(r*0.35, -r*0.05, r*0.75, r*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // eyes
+    ctx.fillStyle="rgba(0,0,0,0.75)";
+    const blink = slowed ? 0.25 : 1.0;
+    const happyBlink = hugging ? 0.35 : blink;
+    ctx.beginPath();
+    ctx.ellipse(r*0.55, -r*0.18, 2.2, 2.0*happyBlink, 0, 0, Math.PI*2);
+    ctx.ellipse(r*0.18, -r*0.18, 2.2, 2.0*happyBlink, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // nose
+    ctx.fillStyle="rgba(0,0,0,0.65)";
+    ctx.beginPath();
+    ctx.arc(r*0.78, 0.05, 2.4, 0, Math.PI*2);
+    ctx.fill();
+
+    // tiny arms if hugging
+    if(hugging){
+      ctx.strokeStyle="rgba(255,255,255,0.35)";
+      ctx.lineWidth=5;
+      ctx.lineCap="round";
+      ctx.beginPath();
+      ctx.moveTo(r*0.35, r*0.35);
+      ctx.lineTo(r*0.95, r*0.12);
+      ctx.moveTo(r*0.15, r*0.40);
+      ctx.lineTo(r*0.85, r*0.25);
+      ctx.stroke();
+    }
+
+    if(slowed){
+      ctx.globalAlpha=0.9;
+      ctx.fillStyle=COLORS.hurt;
+      ctx.font="900 14px ui-sans-serif, system-ui";
+      ctx.textAlign="center";
+      ctx.fillText("bonked!", 0, -r-18);
+      ctx.globalAlpha=1;
+    }
+
+    ctx.restore();
+  }
+
+  function drawRabbit(x,y,r,t,happy){
+    const bob = Math.sin(t*0.006)*2.2;
+    const hugPulse = state.hugging ? (1 + 0.06*Math.sin((t - state.hugStartedAt)*0.02 + 1.2)) : 1;
+
+    ctx.save();
+    ctx.translate(x,y+bob);
+    ctx.scale(hugPulse, hugPulse);
+
+    // shadow
+    ctx.globalAlpha=0.22;
+    ctx.fillStyle="black";
+    ctx.beginPath();
+    ctx.ellipse(0, r+10, r*1.1, r*0.5, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+
+    // ears
+    ctx.fillStyle=COLORS.rabbit2;
+    ctx.beginPath();
+    ctx.roundRect(-r*0.55, -r*2.2, r*0.45, r*1.55, 10);
+    ctx.roundRect(r*0.10, -r*2.2, r*0.45, r*1.55, 10);
+    ctx.fill();
+
+    // ear inner
+    ctx.fillStyle="rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.roundRect(-r*0.45, -r*2.05, r*0.25, r*1.25, 10);
+    ctx.roundRect(r*0.20, -r*2.05, r*0.25, r*1.25, 10);
+    ctx.fill();
+
+    // head
+    ctx.fillStyle=COLORS.rabbit;
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fill();
+
+    // cheeks
+    ctx.fillStyle="rgba(255, 160, 180, 0.22)";
+    ctx.beginPath();
+    ctx.arc(-r*0.45, r*0.15, r*0.32, 0, Math.PI*2);
+    ctx.arc(r*0.45, r*0.15, r*0.32, 0, Math.PI*2);
+    ctx.fill();
+
+    // eyes
+    ctx.fillStyle="rgba(0,0,0,0.75)";
+    ctx.beginPath();
+    if(state.hugging || happy){
+      // happy closed eyes
+      ctx.ellipse(-r*0.30, -r*0.10, 3.2, 1.4, 0, 0, Math.PI*2);
+      ctx.ellipse(r*0.30, -r*0.10, 3.2, 1.4, 0, 0, Math.PI*2);
+    } else {
+      ctx.arc(-r*0.30, -r*0.12, 2.2, 0, Math.PI*2);
+      ctx.arc(r*0.30, -r*0.12, 2.2, 0, Math.PI*2);
+    }
+    ctx.fill();
+
+    // mouth
+    ctx.strokeStyle="rgba(0,0,0,0.55)";
+    ctx.lineWidth=2;
+    ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.arc(0, r*0.22, r*0.28, 0, Math.PI);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawSquirrel(x,y,r,t,stunned){
+    const wig=Math.sin(t*0.012 + x*0.02)*1.5;
+    ctx.save();
+    ctx.translate(x,y);
+
+    // shadow
+    ctx.globalAlpha=0.22;
+    ctx.fillStyle="black";
+    ctx.beginPath();
+    ctx.ellipse(0, r+9, r*1.05, r*0.48, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+
+    // tail
+    ctx.strokeStyle=COLORS.squirrel2;
+    ctx.lineWidth=11;
+    ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(-r*0.8, 0);
+    ctx.quadraticCurveTo(-r*1.9, -r*0.9+wig, -r*1.2, -r*1.8);
+    ctx.stroke();
+
+    // body
+    ctx.fillStyle=COLORS.squirrel;
+    ctx.beginPath();
+    ctx.ellipse(0,0,r*1.05,r*0.9,0,0,Math.PI*2);
+    ctx.fill();
+
+    // face
+    ctx.fillStyle="rgba(0,0,0,0.14)";
+    ctx.beginPath();
+    ctx.ellipse(r*0.25,-r*0.05,r*0.72,r*0.52,0,0,Math.PI*2);
+    ctx.fill();
+
+    // eyes
+    ctx.fillStyle="rgba(0,0,0,0.75)";
+    const squint=stunned?0.25:1.0;
+    ctx.beginPath();
+    ctx.ellipse(r*0.35,-r*0.15,2.0,2.0*squint,0,0,Math.PI*2);
+    ctx.ellipse(r*0.05,-r*0.15,2.0,2.0*squint,0,0,Math.PI*2);
+    ctx.fill();
+
+    // brow
+    ctx.strokeStyle="rgba(0,0,0,0.45)";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(-r*0.05,-r*0.45);
+    ctx.lineTo(r*0.25,-r*0.32);
+    ctx.stroke();
+
+    if(stunned){
+      ctx.globalAlpha=0.85;
+      ctx.fillStyle="rgba(255,255,255,0.9)";
+      ctx.font="900 12px ui-sans-serif, system-ui";
+      ctx.textAlign="center";
+      ctx.fillText("bonk!", 0, -r-16);
+      ctx.globalAlpha=1;
+    }
+
+    ctx.restore();
+  }
+
+  function drawHeart(x, y, s, color){
+    // simple heart shape
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    const k = s/16;
+    ctx.moveTo(0, 6*k);
+    ctx.bezierCurveTo(0, 0, -10*k, 0, -10*k, 6*k);
+    ctx.bezierCurveTo(-10*k, 12*k, 0, 14*k, 0, 20*k);
+    ctx.bezierCurveTo(0, 14*k, 10*k, 12*k, 10*k, 6*k);
+    ctx.bezierCurveTo(10*k, 0, 0, 0, 0, 6*k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // roundRect polyfill
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+      const rr=(typeof r==="number")?{tl:r,tr:r,br:r,bl:r}:r;
+      this.beginPath();
+      this.moveTo(x+rr.tl,y);
+      this.lineTo(x+w-rr.tr,y);
+      this.quadraticCurveTo(x+w,y,x+w,y+rr.tr);
+      this.lineTo(x+w,y+h-rr.br);
+      this.quadraticCurveTo(x+w,y+h,x+w-rr.br,y+h);
+      this.lineTo(x+rr.bl,y+h);
+      this.quadraticCurveTo(x,y+h,x,y+h-rr.bl);
+      this.lineTo(x,y+rr.tl);
+      this.quadraticCurveTo(x,y,x+rr.tl,y);
+      this.closePath();
+      return this;
+    };
+  }
+
+  // start
+  reset();
+  tick();
+})();
+</script>
 </body>
 </html>
